@@ -1,0 +1,257 @@
+{
+  "info": {
+    "name": "Product Management API",
+    "description": "E-commerce product management endpoints. Requests are ordered and chain automatically: creating a category/product/variant stores ids and ETags into collection variables used by later requests. Set {{baseUrl}} to your running API (default http://localhost:8080).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "categoryId", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "productEtag", "value": "" },
+    { "key": "variantId", "value": "" },
+    { "key": "variantEtag", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "Create Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.code === 201);",
+                  "pm.collectionVariables.set('categoryId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/categories",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Jackets\"\n}" }
+          }
+        },
+        {
+          "name": "List Categories",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/categories" }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.code === 201);",
+                  "pm.collectionVariables.set('productId', pm.response.json().id);",
+                  "pm.collectionVariables.set('productEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Classic Denim Jacket\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"description\": \"A timeless denim jacket.\",\n  \"brand\": \"Northwind\",\n  \"attributes\": { \"material\": \"Denim\", \"season\": \"All-season\" }\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.code === 200);",
+                  "pm.collectionVariables.set('productEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/products/{{productId}}" }
+        },
+        {
+          "name": "List Products (filters)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?page=1&pageSize=20&search=denim&sort=-createdAt",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "products" ],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" },
+                { "key": "search", "value": "denim" },
+                { "key": "categoryId", "value": "{{categoryId}}", "disabled": true },
+                { "key": "status", "value": "Active", "disabled": true },
+                { "key": "minPrice", "value": "10", "disabled": true },
+                { "key": "maxPrice", "value": "200", "disabled": true },
+                { "key": "sort", "value": "-createdAt" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Product (If-Match)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.code === 200);",
+                  "pm.collectionVariables.set('productEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "{{productEtag}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/products/{{productId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Classic Denim Jacket\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"description\": \"Updated description.\",\n  \"brand\": \"Northwind\",\n  \"attributes\": { \"material\": \"Denim\", \"season\": \"Spring\" }\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Product - Stale ETag (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": [ "pm.test('409 Conflict', () => pm.response.code === 409);" ] }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "\"1\"" }
+            ],
+            "url": "{{baseUrl}}/api/v1/products/{{productId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Stale Update\",\n  \"categoryId\": \"{{categoryId}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Variants & Inventory",
+      "item": [
+        {
+          "name": "Add Variant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.code === 201);",
+                  "pm.collectionVariables.set('variantId', pm.response.json().id);",
+                  "pm.collectionVariables.set('variantEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/products/{{productId}}/variants",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"DENIM-JKT-M-BLUE\",\n  \"price\": 79.90,\n  \"currency\": \"USD\",\n  \"stockQuantity\": 10,\n  \"attributes\": { \"size\": \"M\", \"color\": \"Blue\" }\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Variant (If-Match)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.code === 200);",
+                  "pm.collectionVariables.set('variantEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "{{variantEtag}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/variants/{{variantId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 74.90,\n  \"currency\": \"USD\",\n  \"stockQuantity\": 12\n}"
+            }
+          }
+        },
+        {
+          "name": "Reserve Stock",
+          "event": [
+            { "listen": "test", "script": { "exec": [ "pm.test('200 OK', () => pm.response.code === 200);" ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/variants/{{variantId}}/reserve",
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 3\n}" }
+          }
+        },
+        {
+          "name": "Reserve Stock - Oversell (expect 409)",
+          "event": [
+            { "listen": "test", "script": { "exec": [ "pm.test('409 Conflict (oversell prevented)', () => pm.response.code === 409);" ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/variants/{{variantId}}/reserve",
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 9999\n}" }
+          }
+        },
+        {
+          "name": "Release Stock",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/variants/{{variantId}}/release",
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 3\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete Product (soft)",
+      "event": [
+        { "listen": "test", "script": { "exec": [ "pm.test('204 No Content', () => pm.response.code === 204);" ] } }
+      ],
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/api/v1/products/{{productId}}" }
+    }
+  ]
+}
